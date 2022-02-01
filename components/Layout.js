@@ -1,16 +1,18 @@
-import React, {useContext} from 'react';
+import React, {useContext, useState} from 'react';
 import Head from 'next/head';
 import NextLink from 'next/link';
-import {AppBar, Toolbar, Typography, Container, Link, createTheme, ThemeProvider, CssBaseline, Switch} from '@material-ui/core'
+import {AppBar, Toolbar, Typography, Container, Link, createTheme, ThemeProvider, CssBaseline, Switch, Badge, Button, Menu, MenuItem} from '@material-ui/core'
 import useStyles from '../utils/styles';
 import { Store } from '../utils/Store';
 import Cookies from 'js-cookie';
+import {useRouter} from 'next/router';
 
-
-export default function Layout({title, description, children}) {
+export default function Layout({ title, description, children }) {
+  const router = useRouter();
   const { state, dispatch } = useContext(Store);
+  const { darkMode, cart, userInfo } = state;
 
-  const { darkMode } = state;
+
 
   const theme = createTheme({
     typography: {
@@ -44,6 +46,25 @@ export default function Layout({title, description, children}) {
     const newDarkMode = !darkMode;
     Cookies.set('darkMode', newDarkMode ? 'ON' : 'OFF')
   }
+  const [anchorEl, setAnchorEl] = useState(null);
+
+  const loginClickHandler = (e) => {
+    setAnchorEl(e.currentTarget);
+}
+
+const loginMenuCloseHandler = () => {
+   setAnchorEl(null);
+}
+
+  const logoutMenuCloseHandler = () => {
+    setAnchorEl(null);
+    dispatch({ type: 'USER_LOGOUT' })
+    Cookies.remove('userInfo');
+    Cookies.remove('cartItems');
+    router.push('/');
+
+
+}
 
   return (
     <div>
@@ -64,11 +85,35 @@ export default function Layout({title, description, children}) {
             <div>
               <Switch checked={darkMode} onChange={darkModeChangeHandler}></Switch>
               <NextLink href="/cart" passHref>
-                <Link>Cart</Link>
+                <Link>
+                  {cart.cartItems.length > 0 ? <Badge color="secondary" badgeContent={cart.cartItems.length}>Cart</Badge> : "Cart"}
+                </Link>
               </NextLink>
-              <NextLink href="/cart" passHref>
+              {userInfo ? (
+                <>
+                  <Button aria-controls="simple-menu" className={classes.navbarButton} aria-haspopup="true" onClick={loginClickHandler}>
+                  {userInfo.name}
+                </Button>
+              <Menu
+              id="simple-menu"
+              anchorEl={anchorEl}
+              keepMounted
+              open={Boolean(anchorEl)}
+              onClose={loginMenuCloseHandler}
+            >
+              <MenuItem onClick={loginMenuCloseHandler}>Profile</MenuItem>
+              <MenuItem onClick={loginMenuCloseHandler}>My account</MenuItem>
+              <MenuItem onClick={logoutMenuCloseHandler}>Logout</MenuItem>
+            </Menu>
+            </>
+
+
+              ) : (
+                <NextLink href="/login" passHref>
                 <Link>Login</Link>
-              </NextLink>
+                </NextLink>)
+              }
+
             </div>
           </Toolbar>
         </AppBar>
