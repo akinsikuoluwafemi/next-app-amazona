@@ -7,8 +7,15 @@ import axios from 'axios';
 import { Store } from '../utils/Store';
 import {useRouter} from 'next/router';
 import Cookies from 'js-cookie';
+import { useForm, Controller } from 'react-hook-form';
+import { useSnackbar } from 'notistack';
 
 export default function Login() {
+
+  const { handleSubmit, control, formState: { errors } } = useForm();
+
+  const {enqueueSnackbar, closeSnackbar} = useSnackbar();
+
   const router = useRouter();
   const { redirect } = router.query; //login?redirect=/shipping
   const { state, dispatch } = useContext(Store);
@@ -22,14 +29,13 @@ export default function Login() {
   },[])
 
 
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+
 
 
   const classes = useStyles();
 
-  const submitHandler = async (e) => {
-    e.preventDefault();
+  const submitHandler = async ({email, password}) => {
+    closeSnackbar()
     try {
 
       const { data } = await axios.post('/api/users/login', { email, password });
@@ -38,8 +44,8 @@ export default function Login() {
       router.push(redirect || '/');
 
     } catch (err) {
-      console.log(err.response.data);
-      alert(err.response.data ? err.response.data.message : err.message);
+      enqueueSnackbar(err.response.data ? err.response.data.message : err.message, {variant: 'error'});
+
     }
 
 
@@ -48,20 +54,69 @@ export default function Login() {
 
   return (
     <Layout title="Login">
-      <form onSubmit={submitHandler} className={classes.form}>
+      <form onSubmit={handleSubmit(submitHandler)} className={classes.form}>
         <Typography variant="h1" component="h1">Login</Typography>
         <List>
+
           <ListItem>
-            <TextField variant="outlined" value={email} onChange={e => setEmail(e.target.value)} fullWidth id="email" label="Email" inputProps={{type: "email"}}></TextField>
+            <Controller
+              name="email"
+              control={control}
+              defaultValue=""
+              rules={{
+                required: true,
+                pattern: /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/
+
+              }}
+              render={({ field }) => (
+                <TextField
+                  variant="outlined"
+                  fullWidth
+                  id="email"
+                  label="Email"
+                  inputProps={{ type: "email" }}
+                  error={Boolean(errors.email)}
+                  helperText={errors.email ? errors.email.type === 'pattern' ? 'Email is not valid' : 'Email is required' : ''}
+                  {...field}
+                >
+                  </TextField>
+           ) }
+          >
+
+          </Controller>
+
           </ListItem>
            <ListItem>
-            <TextField variant="outlined" fullWidth id="password" value={password} onChange={e => setPassword(e.target.value)} label="password" inputProps={{type: "password"}}></TextField>
+            <Controller
+              name="password"
+              control={control}
+              defaultValue=""
+              rules={{
+                required: true,
+                minLength: 6
+              }}
+              render={({ field }) => (
+                <TextField
+                  variant="outlined"
+                  fullWidth
+                  id="password"
+                  label="Password"
+                  inputProps={{ type: "password" }}
+                  error={Boolean(errors.password)}
+                  helperText={errors.password ? errors.password.type === 'minLength' ? 'Password length is more than 5' : 'Password is required' : ''}
+                  {...field}
+                >
+                  </TextField>
+           ) }
+          >
+
+          </Controller>
           </ListItem>
           <ListItem>
             <Button variant="contained" color="primary" type="submit" fullWidth>Login</Button>
           </ListItem>
           <ListItem>
-            Don&apos;t have an account? {' '} &nbsp; <NextLink href="/register" passHref><Link>Register</Link></NextLink>
+            Don&apos;t have an account? {' '} &nbsp; <NextLink href={`/register?redirect=${redirect || '/'}`} passHref><Link>Register</Link></NextLink>
           </ListItem>
 
         </List>
