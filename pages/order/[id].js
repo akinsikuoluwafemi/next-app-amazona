@@ -1,7 +1,7 @@
-import React, { useContext, useEffect, useState } from 'react';
-import Layout from '../components/Layout';
+import React, { useContext, useEffect, useReducer} from 'react';
+import Layout from '../../components/Layout';
 import dynamic from 'next/dynamic';
-import { Store } from '../utils/Store';
+import { Store } from '../../utils/Store';
 import NextLink from 'next/link';
 import Image from 'next/image';
 import {
@@ -14,7 +14,6 @@ import {
   TableCell,
   TableBody,
   Link,
-  Button,
   Card,
   List,
   ListItem,
@@ -22,76 +21,83 @@ import {
 } from '@material-ui/core';
 import axios from 'axios';
 import {useRouter} from 'next/router';
-import useStyles from '../utils/styles';
-import CheckoutWizard from '../components/checkoutWizard';
-import { useSnackbar } from 'notistack';
-import { getError } from '../utils/error';
-import Cookies from 'js-cookie';
+import useStyles from '../../utils/styles';
+import CheckoutWizard from '../../components/checkoutWizard';
+import { getError } from '../../utils/error';
 
-const PlaceOrder = () => {
+
+function reducer(state, action) {
+  switch (action.type) {
+    case 'FETCH_REQUEST':
+      return { ...state, loading: true, error: '' };
+    case 'FETCH_SUCCESS':
+      return { ...state, loading: false, order: action.payload, error: '' };
+    case 'FETCH_FAIL':
+      return { ...state, loading: false, error: action.payload };
+    default:
+      return state;
+  }
+}
+
+const Order = ({ params }) => {
+  console.log(params);
+  const orderId = params.id;
   const classes = useStyles();
   const router = useRouter();
-  const { state, dispatch } = useContext(Store);
-  const { userInfo, cart: { cartItems, shippingAddress, paymentMethod } } = state;
+  const { state } = useContext(Store);
+  const { userInfo } = state;
 
-  const round2 = num => Math.round(num*100 + Number.EPSILON)/100; // round to 2 decimal places
-  const itemsPrice = round2(cartItems.reduce((a,c) => a + c.price * c.quantity, 0));
-  const shippingPrice = itemsPrice > 200 ? 0 : 15;
-  const taxPrice = round2(itemsPrice * 0.15);
-  const totalPrice = round2(itemsPrice + shippingPrice + taxPrice);
 
+  const [{ loading, error, order }, dispatch] = useReducer(reducer, {
+    loading: true,
+    order: {},
+    error: ''
+  });
+
+  const {
+    shippingAddress,
+    paymentMethod,
+    orderItems,
+    itemsPrice,
+    taxPrice,
+    shippingPrice,
+    totalPrice,
+    isPaid,
+    paidAt,
+    isDelivered,
+    deliveredAt
+  } = order;
 
   useEffect(() => {
-    if (!paymentMethod) {
-      router.push('/payment');
+    if (!userInfo) {
+      return router.push('/login');
     }
-    if (cartItems.length === 0) {
-      router.push('/cart');
+    const fetchOrder = async () => {
+      try {
+        dispatch({ type: 'FETCH_REQUEST' });
+        const { data } = await axios.get(`/api/orders/${orderId}`, {
+          headers: { authorization: `Bearer ${userInfo.token}` }
+        });
+        dispatch({ type: 'FETCH_SUCCESS', payload: data })
+
+      } catch (err) {
+        dispatch({ type: 'FETCH_FAIL', payload: getError(err) });
+      }
     }
-  }, []);
-
-  const { closeSnackbar, enqueueSnackbar } = useSnackbar();
-  const [loading, setLoading] = useState();
-
-  const placeOrderHandler = async () => {
-    closeSnackbar();
-    try {
-      setLoading(true);
-      const { data } = await axios.post(
-        '/api/orders',
-        {
-        orderItems: cartItems,
-        shippingAddress,
-        paymentMethod,
-        itemsPrice,
-        shippingPrice,
-        taxPrice,
-        totalPrice,
-      }, {
-        headers: {
-          authorization: `Bearer ${userInfo.token}`,
-        }
-      });
-      dispatch({ type: 'CART_CLEAR' })
-      Cookies.remove('cartItems');
-      setLoading(false);
-      router.push(`/order/${data._id}`);
-    } catch (err) {
-      setLoading(false);
-      alert('failing');
-      enqueueSnackbar(getError(err), {variant: 'error'})
+    if (!order._id || (order._id && order._id !== orderId)) {
+      fetchOrder();
     }
+  }, [order]);
 
-  }
 
 
-    return (
-      <Layout title="Place Order">
+  return (
+    <Layout title={`Order ${orderId}`}>
         <CheckoutWizard activeStep={3}/>
       <Typography component="h1" variant="h1">
-        Place Order
+        Order {orderId}
       </Typography>
-
+      {loading ? (<CircularProgress />) : error ? <Typography className={classes.error}>{error}</Typography> : (
         <Grid container spacing={1}>
           <Grid item md={9} xs={12}>
             <Card className={classes.section}>
@@ -104,6 +110,9 @@ const PlaceOrder = () => {
                   {shippingAddress.city}, {shippingAddress.postalCode}, {' '}
                   {shippingAddress.country}
                 </ListItem>
+                <ListItem>
+                  Status: {isDelivered ? `delivered at ${deliveredAt}` : 'not delivered'}
+                </ListItem>
               </List>
             </Card>
             <Card className={classes.section}>
@@ -113,6 +122,9 @@ const PlaceOrder = () => {
                 </ListItem>
                  <ListItem>
                   {paymentMethod}
+                </ListItem>
+                <ListItem>
+                  Status: {isPaid ? `paid at ${paidAt}` : 'not paid'}
                 </ListItem>
               </List>
             </Card>
@@ -133,7 +145,7 @@ const PlaceOrder = () => {
                           </TableRow>
                         </TableHead>
                         <TableBody>
-                          {cartItems.map((item) => (
+                          {orderItems.map((item) => (
                             <TableRow key={item._id}>
                               <TableCell>
                                 <NextLink href={`/product/${item.slug}`} passHref>
@@ -227,21 +239,22 @@ const PlaceOrder = () => {
                     </Grid>
                   </Grid>
                 </ListItem>
-                <ListItem>
-                  <Button onClick={placeOrderHandler}  variant="contained" color="primary" fullWidth>
-                    Place Order
-                  </Button>
-                </ListItem>
-                {loading && <ListItem>
-                  <CircularProgress/>
-                </ListItem>}
+
               </List>
             </Card>
           </Grid>
         </Grid>
+      )}
+
     </Layout>
   )
 
 }
 
-export default dynamic(() => Promise.resolve(PlaceOrder), {ssr: false})
+export async function getServerSideProps({ params }) {
+  return { props: { params } };
+}
+
+export default dynamic(() => Promise.resolve(Order), { ssr: false })
+
+
