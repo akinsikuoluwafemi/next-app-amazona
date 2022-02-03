@@ -56,8 +56,11 @@ const loginMenuCloseHandler = () => {
    setAnchorEl(null);
 }
 
-  const logoutMenuCloseHandler = () => {
+  const logoutMenuCloseHandler = (e, redirect) => {
     setAnchorEl(null);
+    if (redirect) {
+       router.push(redirect);
+    }
     dispatch({ type: 'USER_LOGOUT' })
     Cookies.remove('userInfo');
     Cookies.remove('cartItems');
@@ -95,16 +98,16 @@ const loginMenuCloseHandler = () => {
                   {userInfo.name}
                 </Button>
               <Menu
-              id="simple-menu"
-              anchorEl={anchorEl}
-              keepMounted
-              open={Boolean(anchorEl)}
-              onClose={loginMenuCloseHandler}
-            >
-              <MenuItem onClick={loginMenuCloseHandler}>Profile</MenuItem>
-              <MenuItem onClick={loginMenuCloseHandler}>My account</MenuItem>
-              <MenuItem onClick={logoutMenuCloseHandler}>Logout</MenuItem>
-            </Menu>
+                id="simple-menu"
+                anchorEl={anchorEl}
+                keepMounted
+                open={Boolean(anchorEl)}
+                onClose={loginMenuCloseHandler}
+              >
+                <MenuItem onClick={(e) => loginMenuCloseHandler(e, '/profile')}><NextLink href="/profile">Profile</NextLink></MenuItem>
+                <MenuItem onClick={(e) => loginMenuCloseHandler(e, '/order-history')}><NextLink href="/order-history"> Order History </NextLink></MenuItem>
+                <MenuItem onClick={logoutMenuCloseHandler}>Logout</MenuItem>
+              </Menu>
             </>
 
 

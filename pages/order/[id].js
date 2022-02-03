@@ -22,7 +22,6 @@ import {
 import axios from 'axios';
 import {useRouter} from 'next/router';
 import useStyles from '../../utils/styles';
-import CheckoutWizard from '../../components/checkoutWizard';
 import { getError } from '../../utils/error';
 import { usePayPalScriptReducer,PayPalButtons } from '@paypal/react-paypal-js';
 import { useSnackbar } from 'notistack';
@@ -42,6 +41,8 @@ function reducer(state, action) {
       return { ...state, loadingPay: false, successPay: true };
     case 'PAY_FAIL':
       return { ...state, loadingPay: false, errorPay: action.payload };
+    case 'PAY_RESET':
+      return { ...state, loadingPay: false, successPay: false, errorPay:'' };
     default:
       return state;
   }
@@ -56,7 +57,7 @@ const Order = ({ params }) => {
   const { userInfo } = state;
 
 
-  const [{ loading, error, order }, dispatch] = useReducer(reducer, {
+  const [{ loading, error, order, successPay }, dispatch] = useReducer(reducer, {
     loading: true,
     order: {},
     error: ''
@@ -80,6 +81,7 @@ const Order = ({ params }) => {
     if (!userInfo) {
       return router.push('/login');
     }
+
     const fetchOrder = async () => {
       try {
         dispatch({ type: 'FETCH_REQUEST' });
@@ -92,8 +94,12 @@ const Order = ({ params }) => {
         dispatch({ type: 'FETCH_FAIL', payload: getError(err) });
       }
     }
-    if (!order._id || (order._id && order._id !== orderId)) {
+    
+    if (!order._id || successPay || (order._id && order._id !== orderId)) {
       fetchOrder();
+      if (successPay) {
+        dispatch({ type: 'PAY_RESET' });
+      }
     } else {
       const loadPaypalScript = async () => {
 
@@ -113,7 +119,7 @@ const Order = ({ params }) => {
       }
       loadPaypalScript();
     }
-  }, [order]);
+  }, [order, successPay]);
 
   const { enqueueSnackbar } = useSnackbar();
 
@@ -156,8 +162,7 @@ const Order = ({ params }) => {
 
   return (
     <Layout title={`Order ${orderId}`}>
-        <CheckoutWizard activeStep={3}/>
-      <Typography component="h1" variant="h1">
+       <Typography component="h1" variant="h1">
         Order {orderId}
       </Typography>
       {loading ? (<CircularProgress />) : error ? <Typography className={classes.error}>{error}</Typography> : (
